@@ -1,0 +1,11 @@
+ Task: Add a `/agent` command to aider that lets me run custom Python scripts to automate tasks or add features.
+
+ Goal:  Create a new `/agent <python_file>` command in aider. This command will run the given Python script, providing it wi
+ the current chat history. The script's output will be fed back into aider as if I typed it in.
+
+ Example Agent:  A simple Python script `check_if_done.py` that, when run via `/agent check_if_done.py`, checks if the AI ha
+ recently made a code edit. If so, it will print "check your code, are you done with the changes?" in the aider chat,
+ reminding me to review the edits.
+
+ Outcome: After these changes, I can use the `/agent` command followed by a Python script to extend aider's functionality wi
+ custom agents.
