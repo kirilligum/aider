@@ -22,6 +22,7 @@ from aider.repo import ANY_GIT_ERROR
 from aider.run_cmd import run_cmd
 from aider.scrape import Scraper, install_playwright
 from aider.utils import is_image_file
+import json
 
 from .dump import dump  # noqa: F401
 
@@ -161,6 +162,70 @@ class Commands:
             models.print_matching_models(self.io, args)
         else:
             self.io.tool_output("Please provide a partial model name to search for.")
+
+    def cmd_agent(self, args=""):
+        "Run a custom agent script"
+        agent_file_path = args.strip()
+        if not agent_file_path:
+            self.io.tool_error("Please provide a path to the agent script.")
+            return
+
+        agent_file = Path(agent_file_path)
+        if not agent_file.exists() or not agent_file.is_file():
+            self.io.tool_error(f"Agent script not found: {agent_file_path}")
+            return
+
+        if not agent_file_path.endswith(".py"):
+            self.io.tool_warning(
+                "Agent script should be a python file with extension '.py',"
+                f" but got '{agent_file_path}'."
+            )
+
+        try:
+            # Get chat history as json
+            history_json = self.get_chat_history_json()
+
+            # Execute the agent script, piping in the chat history json
+            process = subprocess.Popen(
+                ["python", str(agent_file)],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, # Capture stderr for potential agent errors
+                text=True,
+                encoding=self.io.encoding,
+                errors="replace",
+            )
+            stdout, stderr = process.communicate(history_json)
+
+            if stderr:
+                self.io.tool_error(f"Agent script '{agent_file_path}' printed to stderr:\n{stderr}")
+
+            agent_output = stdout.strip()
+            if agent_output:
+                self.io.tool_output(f"Agent script '{agent_file_path}' output:\n{agent_output}")
+                # Feed the agent's output back into aider as a command
+                self.run(agent_output)
+
+        except FileNotFoundError:
+            self.io.tool_error(
+                "Python interpreter not found. Make sure python is in your PATH"
+            )
+        except subprocess.CalledProcessError as e:
+            self.io.tool_error(
+                f"Agent script '{agent_file_path}' failed with exit code {e.returncode}:\n{e.stderr}"
+            )
+        except Exception as e:
+            self.io.tool_error(f"Error running agent script '{agent_file_path}': {e}")
+
+    def get_chat_history_json(self):
+        """
+        Returns the current chat history as a JSON string.
+        """
+        messages = self.coder.done_messages + self.coder.cur_messages
+        history = [
+            {"role": msg["role"], "content": msg["content"]} for msg in messages
+        ]
+        return json.dumps(history)
 
     def cmd_web(self, args, return_content=False):
         "Scrape a webpage, convert to markdown and send in a message"
